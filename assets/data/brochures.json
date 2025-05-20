@@ -1,0 +1,38 @@
+[
+  {
+    "id": "lidl-catalog-1",
+    "title": "Lidl Actual Catalog",
+    "validity": "May 15, 2025 - May 21, 2025",
+    "thumbnailUrl": "assets/lidl_catalog/page_01.jpg",
+    "pageUrls": [
+      "assets/lidl_catalog/page_01.jpg",
+      "assets/lidl_catalog/page_02.jpg",
+      "assets/lidl_catalog/page_03.jpg",
+      "assets/lidl_catalog/page_04.jpg",
+      "assets/lidl_catalog/page_05.jpg",
+      "assets/lidl_catalog/page_06.jpg",
+      "assets/lidl_catalog/page_07.jpg",
+      "assets/lidl_catalog/page_08.jpg",
+      "assets/lidl_catalog/page_09.jpg",
+      "assets/lidl_catalog/page_10.jpg"
+    ]
+  },
+  {
+    "id": "aldi-catalog-1",
+    "title": "Aldi Super Savers",
+    "validity": "May 10, 2025 - May 16, 2025",
+    "thumbnailUrl": "assets/aldi_catalog/page_01.jpg",
+    "pageUrls": [
+      "assets/aldi_catalog/page_01.jpg",
+      "assets/aldi_catalog/page_02.jpg",
+      "assets/aldi_catalog/page_03.jpg",
+      "assets/aldi_catalog/page_04.jpg",
+      "assets/aldi_catalog/page_05.jpg",
+      "assets/aldi_catalog/page_06.jpg",
+      "assets/aldi_catalog/page_07.jpg",
+      "assets/aldi_catalog/page_08.jpg",
+      "assets/aldi_catalog/page_09.jpg",
+      "assets/aldi_catalog/page_10.jpg"
+    ]
+  }
+]

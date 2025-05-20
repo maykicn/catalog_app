@@ -1,100 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:catalog_app/brochure_list_screen.dart'; // Yeni oluşturduğumuz dosyayı import et
 
 void main() {
-  // The main function that starts the app
   runApp(const MyApp());
 }
 
-// The top-level widget of the application
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Profital Clone MVP', // App title
+      title: 'Profital Clone MVP',
       theme: ThemeData(
-        primarySwatch: Colors.blue, // Primary color palette for the app
+        primarySwatch: Colors.blue,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.red, // AppBar color (Lidl-like)
-          foregroundColor: Colors.white, // AppBar text color
+          backgroundColor: Colors.red, // Consistent AppBar color
+          foregroundColor: Colors.white,
         ),
       ),
-      home: const CatalogView(), // Our main screen will now be CatalogView
-      debugShowCheckedModeBanner: false, // Removes the debug banner
+      // Uygulamanın ana ekranı artık BrochureListScreen olacak
+      home: const BrochureListScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-// Main widget to display catalogs
+// CatalogView artık dışarıdan parametreler alacak şekilde güncellendi
 class CatalogView extends StatefulWidget {
-  const CatalogView({super.key});
+  final String catalogTitle;
+  final String catalogValidity;
+  final List<String> catalogImages;
+
+  const CatalogView({
+    super.key,
+    required this.catalogTitle,
+    required this.catalogValidity,
+    required this.catalogImages,
+  });
 
   @override
   _CatalogViewState createState() => _CatalogViewState();
 }
 
 class _CatalogViewState extends State<CatalogView> {
-  // List of catalog image paths, hardcoded for now.
-  // Make sure these paths match your actual image files in assets/lidl_catalog/
-  final List<String> catalogImages = [
-    'assets/lidl_catalog/page_01.jpg',
-    'assets/lidl_catalog/page_02.jpg',
-    'assets/lidl_catalog/page_03.jpg', 
-    'assets/lidl_catalog/page_04.jpg',
-    'assets/lidl_catalog/page_05.jpg',
-    'assets/lidl_catalog/page_06.jpg',
-    'assets/lidl_catalog/page_07.jpg',
-    'assets/lidl_catalog/page_08.jpg',
-    'assets/lidl_catalog/page_09.jpg',
-    'assets/lidl_catalog/page_10.jpg',
-  ];
-  final String catalogTitle = 'Lidl Aktüel Katalog'; // Can be changed
-  final String catalogValidity = '15.05.2025 - 21.05.2025'; // Replace with actual dates
   int currentPage = 0; // Current page number
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(catalogTitle), // Use the defined title
+        title: Text(widget.catalogTitle), // Use the passed title
         centerTitle: true,
       ),
       body: Column(
         children: [
           Expanded(
             child: PageView.builder(
-              // If no images are added yet, show a warning, otherwise use catalogImages.length
-              itemCount: catalogImages.isNotEmpty ? catalogImages.length : 1, // Number of images
+              itemCount: widget.catalogImages.isNotEmpty ? widget.catalogImages.length : 1,
               onPageChanged: (index) {
                 setState(() {
                   currentPage = index;
                 });
               },
               itemBuilder: (context, index) {
-                if (catalogImages.isEmpty) {
+                if (widget.catalogImages.isEmpty) {
                   return const Center(
                     child: Text(
-                      'Catalog images are loading or not yet added. '
-                      'Please add images to the assets folder.',
+                      'No catalog images available. Please check the data source.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 18),
                     ),
                   );
                 }
                 return Image.asset(
-                  catalogImages[index], // Load image from assets
-                  fit: BoxFit.contain, // Ensures the image fits the screen
+                  widget.catalogImages[index],
+                  fit: BoxFit.contain,
                 );
               },
             ),
           ),
-          // Page number indicator
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text(
-              catalogImages.isNotEmpty
-                  ? 'Page ${currentPage + 1} / ${catalogImages.length}'
+              widget.catalogImages.isNotEmpty
+                  ? 'Page ${currentPage + 1} / ${widget.catalogImages.length}'
                   : 'Loading Catalog...',
               style: const TextStyle(fontSize: 16),
             ),
@@ -102,7 +92,7 @@ class _CatalogViewState extends State<CatalogView> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
             child: Text(
-              'Validity: $catalogValidity',
+              'Validity: ${widget.catalogValidity}',
               style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ),
