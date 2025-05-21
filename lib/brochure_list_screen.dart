@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle; // For loading local assets
-import 'dart:convert'; // For JSON decoding
-import 'package:catalog_app/main.dart'; // Ensure CatalogView is imported
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:catalog_app/main.dart';
+
 
 // Data model for a Brochure item
 // This structure maps directly to the JSON objects in brochures.json
@@ -52,29 +52,36 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
     _loadBrochures(); // Initiate data loading when the screen is initialized
   }
 
-  // Asynchronously loads brochure data from the local JSON asset file
   Future<void> _loadBrochures() async {
     setState(() {
-      isLoading = true; // Start loading, show indicator
-      errorMessage = null; // Clear any previous error messages
+      isLoading = true;
+      errorMessage = null;
     });
     try {
-      // Load the JSON string from the assets folder
-      final String response = await rootBundle.loadString('assets/data/brochures.json');
-      // Decode the JSON string into a Dart list of dynamic maps
-      final List<dynamic> data = json.decode(response);
-      // Convert each map in the list to a Brochure object using the factory constructor
+      // Firestore'dan 'brochures' koleksiyonunu çekiyoruz
+      final QuerySnapshot<Map<String, dynamic>> snapshot =
+          await FirebaseFirestore.instance.collection('brochures').get();
+
+      // Her bir Firestore dokümanını Brochure objesine dönüştürüyoruz
       setState(() {
-        availableBrochures = data.map((json) => Brochure.fromJson(json)).toList();
-        isLoading = false; // Loading finished, hide indicator
+        availableBrochures = snapshot.docs.map((doc) {
+          final data = doc.data();
+          // Firestore'dan gelen id'yi kullanmak için Brochure modeline id ekledik.
+          // Eğer Brochure modelinizde id yoksa, doc.id'yi direkt kullanmıyorsanız bu satır gerekmez.
+          // Ancak iyi bir uygulama olduğu için eklemiştik.
+          return Brochure.fromJson({
+            'id': doc.id, // Firestore doküman ID'si
+            ...data, // Doküman içindeki diğer tüm veriler
+          });
+        }).toList();
+        isLoading = false;
       });
     } catch (e) {
-      // Catch any errors during loading or parsing
       setState(() {
-        errorMessage = 'Failed to load brochures: ${e.toString()}'; // Set error message
-        isLoading = false; // Loading finished, hide indicator
+        errorMessage = 'Failed to load brochures from Firestore: ${e.toString()}';
+        isLoading = false;
       });
-      print('Error loading brochures: $e'); // Print error to console for debugging
+      print('Error loading brochures from Firestore: $e'); // Hata konsola yazılır
     }
   }
 
