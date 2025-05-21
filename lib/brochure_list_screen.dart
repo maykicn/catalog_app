@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
-import 'package:catalog_app/main.dart';
+import 'package:catalog_app/catalog_view.dart';
 
 
 // Data model for a Brochure item
