@@ -59,9 +59,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/lidl_catalog/
-    - assets/aldi_catalog/
-    - assets/data/
+    - assets/images/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

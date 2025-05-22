@@ -200,6 +200,8 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                                             fontSize: 12.0,
                                             color: Colors.grey,
                                           ),
+                                          maxLines: 1, // Limit validity to one line
+                                          overflow: TextOverflow.ellipsis, // Add "..." if validity overflows
                                         ),
                                       ],
                                     ),

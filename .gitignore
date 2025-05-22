@@ -49,3 +49,9 @@ serviceAccountKey.json
 
 # Node modules
 node_modules/
+
+# Python environment
+venv_automation/
+
+# assets/images
+assets/images/
