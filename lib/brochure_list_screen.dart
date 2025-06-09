@@ -32,41 +32,56 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
         title: const Text('Catalogs'),
         centerTitle: true,
         actions: [
-          // Language selection dropdown menu
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.language),
-            onSelected: (String languageCode) {
-              setState(() {
-                _selectedLanguage = languageCode;
-              });
-
-              // =========================================================================================
-              // !!! NOTIFICATION FIX IMPLEMENTED HERE !!!
-              // 1. Hide any currently visible SnackBar to prevent queuing.
-              // 2. Show the new SnackBar with a shorter duration for a snappier feel.
-              // =========================================================================================
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Language changed to ${languageCode.toUpperCase()}.'),
-                  duration: const Duration(seconds: 2), // Shorter duration
+          // =========================================================================================
+          // !!! FANCY LANGUAGE BUTTON IMPLEMENTED HERE !!!
+          // The generic globe icon has been replaced with a styled button that shows the
+          // current language code (DE, FR, IT). Tapping this button opens the menu.
+          // =========================================================================================
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: PopupMenuButton<String>(
+              onSelected: (String languageCode) {
+                setState(() {
+                  _selectedLanguage = languageCode;
+                });
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Language changed to ${languageCode.toUpperCase()}.'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'de',
+                  child: Text('Deutsch'),
                 ),
-              );
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'de',
-                child: Text('Deutsch'),
+                const PopupMenuItem<String>(
+                  value: 'fr',
+                  child: Text('Français'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'it',
+                  child: Text('Italiano'),
+                ),
+              ],
+              // This is the new button widget that replaces the old icon
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white70, width: 1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _selectedLanguage.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              const PopupMenuItem<String>(
-                value: 'fr',
-                child: Text('Français'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'it',
-                child: Text('Italiano'),
-              ),
-            ],
+            ),
           ),
         ],
       ),
