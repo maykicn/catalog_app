@@ -1,7 +1,48 @@
-import requests
-from bs4 import BeautifulSoup
 import os
 import shutil
+import datetime
+import time
+import logging
+
+# =========================================================================================
+# !!! PROFESSIONAL LOGGING SETUP - MOVED TO TOP !!!
+# The logging module is configured here, at the very beginning of the script.
+# This ensures our custom formatting is applied BEFORE any other imported library
+# can set up its own basic logging, which would prevent our format from working.
+# =========================================================================================
+def setup_logging():
+    """Configures the logging for the script to provide detailed, professional output."""
+    # This professional format includes the function name and line number for precise debugging.
+    log_formatter = logging.Formatter(
+        '%(asctime)s - [%(funcName)s:%(lineno)d] - %(levelname)s - %(message)s'
+    )
+    
+    # Get the root logger
+    root_logger = logging.getLogger()
+    
+    # Clear any existing handlers to prevent duplicate log messages
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
+        
+    # Set the logging level (INFO is a good default, DEBUG is more verbose)
+    root_logger.setLevel(logging.INFO) 
+    
+    # Create and add a file handler to save logs to 'catalog_automation.log'
+    file_handler = logging.FileHandler('catalog_automation.log', mode='w') # 'w' overwrites the log each run
+    file_handler.setFormatter(log_formatter)
+    root_logger.addHandler(file_handler)
+    
+    # Create and add a console handler to display logs in the terminal
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    root_logger.addHandler(console_handler)
+
+# --- SETUP LOGGING IMMEDIATELY ---
+setup_logging()
+
+# --- NOW, IMPORT ALL OTHER LIBRARIES ---
+import requests
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -11,57 +52,47 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException, ElementClickInterceptedException
 import fitz  # PyMuPDF
 from PIL import Image
-import datetime
-import time
-
-# --- Firebase Admin SDK Setup ---
-# Make sure to install the firebase-admin library: pip install firebase-admin
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 
-# --- Firebase Configuration ---
-# IMPORTANT: Replace with the actual path to your service account key file
-SERVICE_ACCOUNT_KEY_PATH = 'C:\\Users\\TAACAMU4\\Work\\Projects\\PORTFOLIO\\catalog_app\\serviceAccountKey.json'
 
-# =========================================================================================
-# !!! IMPORTANT FIX FOR FIREBASE STORAGE ERROR !!!
-# The bucket name has been corrected based on your screenshot.
-# The original script had ".appspot.com", but your bucket uses ".firebasestorage.app".
-# =========================================================================================
-FIREBASE_STORAGE_BUCKET = 'catalogapp-7b5bc.firebasestorage.app' # <-- CORRECTED BUCKET NAME
+# --- Firebase Configuration ---
+SERVICE_ACCOUNT_KEY_PATH = 'C:\\Users\\TAACAMU4\\Work\\Projects\\PORTFOLIO\\catalog_app\\serviceAccountKey.json'
+FIREBASE_STORAGE_BUCKET = 'catalogapp-7b5bc.firebasestorage.app'
 
 # --- Initialize Firebase Admin SDK ---
 try:
+    logging.info("Initializing Firebase Admin SDK...")
     cred = credentials.Certificate(SERVICE_ACCOUNT_KEY_PATH)
-    firebase_admin.initialize_app(cred, {
-        'storageBucket': FIREBASE_STORAGE_BUCKET
-    })
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred, {
+            'storageBucket': FIREBASE_STORAGE_BUCKET
+        })
     db = firestore.client()
     bucket = storage.bucket()
-    print("Firebase Admin SDK initialized successfully. Firestore and Storage are connected.")
+    logging.info("Firebase Admin SDK initialized successfully.")
 except Exception as e:
-    print(f"Firebase Admin SDK initialization error: {e}")
-    print("Please ensure 'serviceAccountKey.json' is valid and the path is correct.")
-    print("Most importantly, verify the FIREBASE_STORAGE_BUCKET name above.")
+    logging.critical(f"Firebase Admin SDK initialization error: {e}")
     exit()
 
 # --- Path Configurations ---
 FLUTTER_PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 PDF_DOWNLOAD_DIR = os.path.join(FLUTTER_PROJECT_ROOT, 'temp_pdfs')
-LOCAL_IMAGE_DIR = os.path.join(FLUTTER_PROJECT_ROOT, 'temp_images') # For temporary local storage before upload
+LOCAL_IMAGE_DIR = os.path.join(FLUTTER_PROJECT_ROOT, 'temp_images')
 
 # --- Selenium Setup ---
-# IMPORTANT: Replace with the actual path to your chromedriver.exe
 CHROME_DRIVER_PATH = 'C:\\Users\\TAACAMU4\\Work\\Projects\\PORTFOLIO\\catalog_app\\chromedriver.exe'
 
 def setup_driver():
-    """(USER'S ORIGINAL SCRIPT) Configures and returns a Selenium WebDriver instance."""
+    """Configures and returns a Selenium WebDriver instance."""
     options = Options()
     # options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--start-maximized")
+    # Suppress most of the verbose console output from ChromeDriver/Selenium itself
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
     prefs = {
         "download.default_directory": PDF_DOWNLOAD_DIR,
@@ -75,75 +106,69 @@ def setup_driver():
     return driver
 
 def get_latest_pdf_link_selenium(market_name, market_url):
-    """(USER'S ORIGINAL SCRIPT) Uses Selenium to find the URL for the latest PDF catalog."""
+    """(USER'S PROVEN LOGIC RESTORED) Uses Selenium to find the URL for the latest PDF catalog."""
     driver = setup_driver()
     pdf_url = None
     try:
-        print(f"Navigating to {market_name.upper()} at {market_url}...")
+        logging.info(f"Navigating to {market_name.upper()} at {market_url}...")
         driver.get(market_url)
 
         # --- Handle Cookie Consent ---
         try:
             accept_cookies_selectors = [
-                "button.uc-btn[data-accept-action='all']",
-                "button.accept-all-button",
                 "#onetrust-accept-btn-handler",
-                "button.button--secondary.cookie-button",
+                "button.uc-btn[data-accept-action='all']",
                 "button[id^='onetrust-accept-btn']",
-                "div.cookie-banner button"
             ]
             accepted = False
             for selector in accept_cookies_selectors:
                 try:
-                    accept_cookies_button = WebDriverWait(driver, 3).until(
+                    accept_button = WebDriverWait(driver, 5).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
                     )
-                    accept_cookies_button.click()
-                    print(f"Accepted cookie preferences using selector: {selector}.")
-                    WebDriverWait(driver, 3).until(
-                        EC.invisibility_of_element_located((By.CSS_SELECTOR, selector))
-                    )
+                    accept_button.click()
+                    logging.info(f"Accepted cookie preferences using selector: {selector}.")
+                    WebDriverWait(driver, 5).until(EC.invisibility_of_element_located((By.CSS_SELECTOR, selector)))
                     accepted = True
                     break
                 except (TimeoutException, NoSuchElementException, ElementClickInterceptedException):
                     continue
             if not accepted:
-                print("No cookie consent pop-up found or button not clickable within timeout. Proceeding...")
-        except Exception as e:
-            print(f"An error occurred while handling cookie consent: {e}. Proceeding...")
+                logging.warning("No cookie consent pop-up found or handled. Proceeding...")
+        except Exception:
+            logging.exception("An error occurred while handling cookie consent. Proceeding...")
 
         # 1. Click the main page flyer
-        print("Waiting for main page flyers to load...")
+        logging.info("Waiting for main page flyers to load...")
         latest_flyer_element = WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.flyer'))
         )
         flyer_preview_url = latest_flyer_element.get_attribute('href')
-        print(f"Found latest flyer preview URL: {flyer_preview_url}")
+        logging.info(f"Found latest flyer preview URL: {flyer_preview_url}")
 
         try:
             latest_flyer_element.click()
-            print(f"Clicked on flyer, navigating to: {flyer_preview_url}")
+            logging.info(f"Clicked on flyer, navigating to: {flyer_preview_url}")
         except ElementClickInterceptedException:
-            print("Click intercepted on flyer element. Trying JavaScript click...")
+            logging.warning("Click intercepted on flyer element. Trying JavaScript click...")
             driver.execute_script("arguments[0].click();", latest_flyer_element)
-            print(f"Clicked on flyer via JavaScript, navigating to: {flyer_preview_url}")
         except TimeoutException:
-            print("Timed out waiting for flyer to be clickable.")
+            logging.error("Timed out waiting for flyer to be clickable.")
             return None
 
         # 2. Wait for preview page to load
-        print("Waiting for preview page to load and menu button to appear...")
+        logging.info("Waiting for preview page to load and menu button to appear...")
         WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, 'span.button__icon svg.icon-bars-horizontal, a[href*=".pdf"], button[aria-label*="download"], a[data-label="Download"]'))
         )
 
-        # 3. Click menu and find download link
+        # 3. Click menu and find download link (USER'S ORIGINAL LOGIC)
         try:
             menu_button_icon = driver.find_element(By.CSS_SELECTOR, 'span.button__icon svg.icon-bars-horizontal')
             menu_button = menu_button_icon.find_element(By.XPATH, './ancestor::button')
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable(menu_button))
             menu_button.click()
-            print("Clicked on menu button.")
+            logging.info("Clicked on menu button.")
             
             pdf_download_link_xpath = (
                 "//a[contains(@class, 'button--primary') and contains(@class, 'menu-item__button') and ("
@@ -160,11 +185,10 @@ def get_latest_pdf_link_selenium(market_name, market_url):
                 EC.presence_of_element_located((By.XPATH, pdf_download_link_xpath))
             )
             pdf_url = pdf_download_link.get_attribute('href')
-            print(f"Found PDF download URL: {pdf_url}")
+            logging.info(f"Found PDF download URL in menu: {pdf_url}")
             return pdf_url
         except (NoSuchElementException, TimeoutException, ElementClickInterceptedException) as e:
-            print(f"Error with menu button or PDF download link: {e}")
-            print("Trying to find a direct PDF download link as a fallback...")
+            logging.warning(f"Error with menu button or PDF download link: {e}. Trying fallback...")
             try:
                 direct_link_xpath = (
                     "//a[contains(@href, '.pdf') and ("
@@ -180,75 +204,78 @@ def get_latest_pdf_link_selenium(market_name, market_url):
                     EC.presence_of_element_located((By.XPATH, direct_link_xpath))
                 )
                 pdf_url = direct_pdf_link_element.get_attribute('href')
-                print(f"Found direct PDF link on page as fallback: {pdf_url}")
+                logging.info(f"Found direct PDF link on page as fallback: {pdf_url}")
                 return pdf_url
             except (TimeoutException, NoSuchElementException) as e_fallback:
-                print(f"No direct PDF link found as fallback: {e_fallback}")
-                print("Could not locate PDF download mechanism. You may need to inspect the page manually.")
+                logging.error(f"No direct PDF link found as fallback: {e_fallback}")
                 return None
                 
-    except WebDriverException as e:
-        print(f"WebDriver error: {e}")
+    except WebDriverException:
+        logging.exception("WebDriver error. Ensure chromedriver is installed and path is correct.")
         return None
-    except Exception as e:
-        print(f"An unexpected error occurred during the Selenium process: {e}")
-        driver.save_screenshot(f"error_screenshot_{market_name}_{int(time.time())}.png")
-        print("Saved an error screenshot for debugging.")
+    except Exception:
+        logging.exception(f"An unexpected error occurred during the Selenium process for {market_name}.")
+        try:
+            screenshot_path = f"error_screenshot_{market_name}_{int(time.time())}.png"
+            driver.save_screenshot(screenshot_path)
+            logging.info(f"Saved an error screenshot for debugging: {screenshot_path}")
+        except Exception as e:
+            logging.error(f"Could not even save a screenshot: {e}")
         return None
     finally:
         if driver:
-            print("Quitting WebDriver.")
+            logging.info("Quitting WebDriver.")
             driver.quit()
 
 def download_pdf(pdf_url, market_name, lang_code):
-    """(USER'S ORIGINAL SCRIPT) Downloads a PDF from a URL or finds the latest downloaded file."""
+    """Downloads a PDF from a URL or finds the latest downloaded file."""
     filename = f"{market_name}_{lang_code}_catalog_{datetime.date.today().strftime('%Y%m%d')}.pdf"
     filepath = os.path.join(PDF_DOWNLOAD_DIR, filename)
 
     if pdf_url:
-        print(f"Downloading PDF from: {pdf_url} to {filepath} using requests...")
+        logging.info(f"Downloading PDF from: {pdf_url} to {filepath}...")
         try:
             response = requests.get(pdf_url, stream=True, timeout=60)
             response.raise_for_status()
             with open(filepath, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-            print(f"PDF downloaded to: {filepath}")
+            logging.info(f"PDF downloaded to: {filepath}")
             return filepath
-        except requests.exceptions.RequestException as e:
-            print(f"Error downloading PDF {pdf_url}: {e}")
+        except requests.exceptions.RequestException:
+            logging.exception(f"Error downloading PDF from {pdf_url}")
             return None
     else:
-        print(f"No direct PDF URL provided. Checking for downloaded file in {PDF_DOWNLOAD_DIR}...")
+        logging.warning(f"No direct PDF URL provided. Checking for downloaded file in {PDF_DOWNLOAD_DIR}...")
         time.sleep(5)
         
-        pdf_files = [f for f in os.listdir(PDF_DOWNLOAD_DIR) if f.endswith('.pdf')]
-        if not pdf_files:
-            print(f"No PDF found in {PDF_DOWNLOAD_DIR} after Selenium operation.")
-            return None
-        
-        latest_pdf_file = max(pdf_files, key=lambda f: os.path.getmtime(os.path.join(PDF_DOWNLOAD_DIR, f)))
-        found_filepath = os.path.join(PDF_DOWNLOAD_DIR, latest_pdf_file)
-        
-        if os.path.basename(found_filepath) != filename:
-            try:
-                print(f"Found recently downloaded PDF: {found_filepath}. Renaming to: {filename}")
+        try:
+            pdf_files = [f for f in os.listdir(PDF_DOWNLOAD_DIR) if f.endswith('.pdf')]
+            if not pdf_files:
+                logging.error(f"No PDF found in {PDF_DOWNLOAD_DIR} after Selenium operation.")
+                return None
+            
+            latest_pdf_file = max(pdf_files, key=lambda f: os.path.getmtime(os.path.join(PDF_DOWNLOAD_DIR, f)))
+            found_filepath = os.path.join(PDF_DOWNLOAD_DIR, latest_pdf_file)
+            
+            if os.path.basename(found_filepath) != filename:
+                logging.info(f"Found downloaded PDF: {found_filepath}. Renaming to: {filename}")
                 shutil.move(found_filepath, filepath)
                 return filepath
-            except Exception as e:
-                print(f"Error renaming downloaded PDF: {e}. Returning original path: {found_filepath}")
+            else:
+                logging.info(f"Found downloaded PDF: {found_filepath} (already named correctly).")
                 return found_filepath
-        else:
-            print(f"Found recently downloaded PDF: {found_filepath} (already named correctly).")
-            return found_filepath
+        except Exception:
+            logging.exception("Error finding/renaming downloaded file.")
+            return None
 
 def convert_pdf_to_images(pdf_path, output_image_dir, dpi=200):
     """Converts a PDF file into a series of PNG images."""
     if not pdf_path or not os.path.exists(pdf_path):
-        print(f"PDF file not found at {pdf_path}. Cannot convert.")
+        logging.error(f"PDF file not found at {pdf_path}. Cannot convert.")
         return []
 
-    print(f"Converting PDF {pdf_path} to images...")
+    logging.info(f"Converting PDF {pdf_path} to images...")
     local_image_paths = []
     try:
         pdf_document = fitz.open(pdf_path)
@@ -263,17 +290,17 @@ def convert_pdf_to_images(pdf_path, output_image_dir, dpi=200):
             img.save(image_path)
             local_image_paths.append(image_path)
             
-        print(f"PDF converted. Total {len(local_image_paths)} images generated in {output_image_dir}.")
+        logging.info(f"PDF converted. Total {len(local_image_paths)} images generated in {output_image_dir}.")
         return local_image_paths
-    except Exception as e:
-        print(f"Error converting PDF to images: {e}")
+    except Exception:
+        logging.exception(f"Error converting PDF to images: {pdf_path}")
         return []
 
 def upload_images_to_storage(local_image_paths, market_name, lang_code):
     """Uploads local images to Firebase Storage and returns their public URLs."""
     if not local_image_paths: return []
 
-    print(f"Uploading {len(local_image_paths)} images to Firebase Storage...")
+    logging.info(f"Uploading {len(local_image_paths)} images to Firebase Storage...")
     public_urls = []
     for local_path in local_image_paths:
         try:
@@ -283,43 +310,42 @@ def upload_images_to_storage(local_image_paths, market_name, lang_code):
             blob.upload_from_filename(local_path)
             blob.make_public()
             public_urls.append(blob.public_url)
-            print(f"  - Uploaded {file_name} to {destination_blob_name}")
-        except Exception as e:
-            print(f"Failed to upload {os.path.basename(local_path)} to Firebase Storage: {e}")
-            print("  - PLEASE CHECK YOUR FIREBASE_STORAGE_BUCKET NAME AT THE TOP OF THE SCRIPT.")
+            logging.info(f"  - Uploaded {file_name} to {destination_blob_name}")
+        except Exception:
+            logging.exception(f"Failed to upload {os.path.basename(local_path)} to Firebase Storage.")
     
-    print(f"Finished uploading. {len(public_urls)} of {len(local_image_paths)} images are now public.")
+    logging.info(f"Finished uploading. {len(public_urls)} of {len(local_image_paths)} images are now public.")
     return public_urls
 
 def update_firestore(market_name, catalog_title, catalog_validity, thumbnail_url, page_urls, language):
     """Deletes old catalogs and adds a new one to Firestore with public Storage URLs."""
     if not page_urls:
-        print("No storage URLs provided to update_firestore. Skipping database update.")
+        logging.warning("No storage URLs provided to update_firestore. Skipping database update.")
         return
         
     brochures_ref = db.collection('brochures')
     
-    print(f"Updating Firestore for {market_name} ({language})...")
-    query = brochures_ref.where('marketName', '==', market_name).where('language', '==', language)
-    for doc in query.stream():
-        print(f"  - Deleting old catalog: {doc.id}")
-        doc.reference.delete()
-        
-    new_catalog_data = {
-        'marketName': market_name,
-        'title': catalog_title,
-        'validity': catalog_validity,
-        'thumbnail': thumbnail_url,
-        'pages': page_urls,
-        'timestamp': firestore.SERVER_TIMESTAMP,
-        'language': language
-    }
-    
+    logging.info(f"Updating Firestore for {market_name} ({language})...")
     try:
+        query = brochures_ref.where('marketName', '==', market_name).where('language', '==', language)
+        for doc in query.stream():
+            logging.info(f"  - Deleting old catalog: {doc.id}")
+            doc.reference.delete()
+            
+        new_catalog_data = {
+            'marketName': market_name,
+            'title': catalog_title,
+            'validity': catalog_validity,
+            'thumbnail': thumbnail_url,
+            'pages': page_urls,
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'language': language
+        }
+    
         doc_ref = brochures_ref.add(new_catalog_data)
-        print(f"New catalog added to Firestore with ID: {doc_ref[1].id}")
-    except Exception as e:
-        print(f"Error adding document to Firestore: {e}")
+        logging.info(f"New catalog added to Firestore with ID: {doc_ref[1].id}")
+    except Exception:
+        logging.exception(f"Error updating Firestore for {market_name} ({language})")
 
 def cleanup_directory(dir_path):
     """Removes and recreates a directory."""
@@ -327,18 +353,18 @@ def cleanup_directory(dir_path):
         try:
             shutil.rmtree(dir_path)
         except OSError as e:
-            print(f"Error removing directory {dir_path}: {e}. Please check file permissions.")
+            logging.error(f"Error removing directory {dir_path}: {e}. Please check file permissions.")
             return False
     os.makedirs(dir_path, exist_ok=True)
     return True
 
 def main():
     """Main execution function."""
-    print("--- Starting Catalog Automation Script ---")
-    
+    logging.info("--- Starting Catalog Automation Script ---")
+
     if not cleanup_directory(PDF_DOWNLOAD_DIR) or not cleanup_directory(LOCAL_IMAGE_DIR):
         return
-    print(f"Created temporary directories: {PDF_DOWNLOAD_DIR} and {LOCAL_IMAGE_DIR}")
+    logging.info(f"Created temporary directories: {PDF_DOWNLOAD_DIR} and {LOCAL_IMAGE_DIR}")
 
     markets_and_languages = {
         ("lidl", "de"): "https://www.lidl.ch/c/de-CH/werbeprospekte-als-pdf/s10019683",
@@ -348,29 +374,32 @@ def main():
     language_names = {"de": "Deutsch", "fr": "Français", "it": "Italiano"}
 
     for (market_name, lang_code), market_url in markets_and_languages.items():
-        print(f"\n{'='*20} Processing {market_name.upper()} ({lang_code.upper()}) {'='*20}")
+        logging.info(f"--- Processing {market_name.upper()} ({lang_code.upper()}) ---")
 
-        # Clean temp PDF dir before each run to avoid picking up old files
         if os.path.exists(PDF_DOWNLOAD_DIR):
             for file_name in os.listdir(PDF_DOWNLOAD_DIR):
                 os.remove(os.path.join(PDF_DOWNLOAD_DIR, file_name))
 
         pdf_url_from_selenium = get_latest_pdf_link_selenium(market_name, market_url)
+        if not pdf_url_from_selenium:
+            logging.error(f"Failed to find PDF URL for {market_name} ({lang_code}). Skipping.")
+            continue
+            
         downloaded_pdf_path = download_pdf(pdf_url_from_selenium, market_name, lang_code)
         if not downloaded_pdf_path:
-            print(f"Could not download or find PDF for {market_name} ({lang_code}). Skipping.")
+            logging.error(f"Could not download or find PDF for {market_name} ({lang_code}). Skipping.")
             continue
             
         current_image_output_dir = os.path.join(LOCAL_IMAGE_DIR, market_name, lang_code)
         os.makedirs(current_image_output_dir, exist_ok=True)
         local_image_paths = convert_pdf_to_images(downloaded_pdf_path, current_image_output_dir)
         if not local_image_paths:
-            print(f"No images were generated for {market_name} ({lang_code}). Skipping.")
+            logging.error(f"No images were generated for {market_name} ({lang_code}). Skipping.")
             continue
 
         storage_urls = upload_images_to_storage(local_image_paths, market_name, lang_code)
         if not storage_urls:
-            print(f"Failed to upload any images for {market_name} ({lang_code}). Skipping Firestore update.")
+            logging.error(f"Failed to upload any images for {market_name} ({lang_code}). Skipping Firestore update.")
             continue
             
         thumbnail_url = storage_urls[0] if storage_urls else ''
@@ -378,13 +407,13 @@ def main():
         catalog_validity = f"Valid from {datetime.date.today().strftime('%d.%m.%Y')} - Next Week"
         
         update_firestore(market_name, catalog_title, catalog_validity, thumbnail_url, storage_urls, lang_code)
-        print(f"--- Successfully processed {market_name.upper()} ({lang_code.upper()}) ---")
+        logging.info(f"--- Successfully processed {market_name.upper()} ({lang_code.upper()}) ---")
         
-    print("\n--- All Catalog Automation Finished ---")
+    logging.info("--- All Catalog Automation Finished ---")
     
     cleanup_directory(PDF_DOWNLOAD_DIR)
     cleanup_directory(LOCAL_IMAGE_DIR)
-    print("Cleaned up all temporary directories.")
+    logging.info("Cleaned up all temporary directories.")
 
 if __name__ == "__main__":
     main()
