@@ -28,7 +28,7 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // CHANGED: Title translated to English
+        // Title translated to English
         title: const Text('Catalogs'),
         centerTitle: true,
         actions: [
@@ -39,9 +39,18 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
               setState(() {
                 _selectedLanguage = languageCode;
               });
+
+              // =========================================================================================
+              // !!! NOTIFICATION FIX IMPLEMENTED HERE !!!
+              // 1. Hide any currently visible SnackBar to prevent queuing.
+              // 2. Show the new SnackBar with a shorter duration for a snappier feel.
+              // =========================================================================================
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
-                // CHANGED: SnackBar message translated to English
-                SnackBar(content: Text('Language changed to ${languageCode.toUpperCase()}.')),
+                SnackBar(
+                  content: Text('Language changed to ${languageCode.toUpperCase()}.'),
+                  duration: const Duration(seconds: 2), // Shorter duration
+                ),
               );
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -68,11 +77,11 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            // CHANGED: Error message translated to English
+            // Error message translated to English
             return Center(child: Text('Error: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            // CHANGED: Empty state message translated to English
+            // Empty state message translated to English
             return const Center(child: Text('No catalogs found for this language.'));
           }
 

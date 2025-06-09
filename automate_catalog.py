@@ -3,6 +3,7 @@ import shutil
 import datetime
 import time
 import logging
+import re
 
 # =========================================================================================
 # !!! PROFESSIONAL LOGGING SETUP - MOVED TO TOP !!!
@@ -86,7 +87,7 @@ CHROME_DRIVER_PATH = 'C:\\Users\\TAACAMU4\\Work\\Projects\\PORTFOLIO\\catalog_ap
 def setup_driver():
     """Configures and returns a Selenium WebDriver instance."""
     options = Options()
-    # options.add_argument("--headless")
+    options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
@@ -105,44 +106,51 @@ def setup_driver():
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
-def get_latest_pdf_link_selenium(market_name, market_url):
-    """(USER'S PROVEN LOGIC RESTORED) Uses Selenium to find the URL for the latest PDF catalog."""
+def get_catalog_data(market_name, market_url):
+    """
+    (ENHANCED) Scrapes the PDF link and the validity date.
+    Returns a tuple: (pdf_url, validity_string)
+    """
     driver = setup_driver()
-    pdf_url = None
     try:
         logging.info(f"Navigating to {market_name.upper()} at {market_url}...")
         driver.get(market_url)
 
         # --- Handle Cookie Consent ---
         try:
-            accept_cookies_selectors = [
-                "#onetrust-accept-btn-handler",
-                "button.uc-btn[data-accept-action='all']",
-                "button[id^='onetrust-accept-btn']",
-            ]
-            accepted = False
+            accept_cookies_selectors = ["#onetrust-accept-btn-handler"]
             for selector in accept_cookies_selectors:
                 try:
-                    accept_button = WebDriverWait(driver, 5).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
-                    )
+                    accept_button = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
                     accept_button.click()
                     logging.info(f"Accepted cookie preferences using selector: {selector}.")
                     WebDriverWait(driver, 5).until(EC.invisibility_of_element_located((By.CSS_SELECTOR, selector)))
-                    accepted = True
                     break
                 except (TimeoutException, NoSuchElementException, ElementClickInterceptedException):
                     continue
-            if not accepted:
-                logging.warning("No cookie consent pop-up found or handled. Proceeding...")
         except Exception:
-            logging.exception("An error occurred while handling cookie consent. Proceeding...")
+            logging.exception("An error occurred while handling cookie consent.")
 
-        # 1. Click the main page flyer
+        # 1. Find the flyer and extract info from it
         logging.info("Waiting for main page flyers to load...")
-        latest_flyer_element = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.flyer'))
-        )
+        latest_flyer_element = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.flyer')))
+        
+        # --- MORE ROBUST DYNAMIC VALIDITY DATE SCRAPING ---
+        validity_text = "Valid this week" # Default value
+        try:
+            # Get all text within the flyer element, which includes the validity date
+            flyer_full_text = latest_flyer_element.text
+            # This improved regex is more flexible for different dash types and spacing.
+            match = re.search(r'(\d{1,2}\.\d{1,2}\.?\s*[–-]\s*\d{1,2}\.\d{1,2}\.?)', flyer_full_text)
+            if match:
+                # Clean up the found date string
+                validity_text = match.group(0).replace("–", "-").strip()
+                logging.info(f"Successfully scraped validity date using regex: '{validity_text}'")
+            else:
+                logging.warning(f"Could not find a date pattern in the flyer text. Using default.")
+        except Exception:
+            logging.warning("An error occurred during date scraping. Using default value.")
+
         flyer_preview_url = latest_flyer_element.get_attribute('href')
         logging.info(f"Found latest flyer preview URL: {flyer_preview_url}")
 
@@ -152,17 +160,14 @@ def get_latest_pdf_link_selenium(market_name, market_url):
         except ElementClickInterceptedException:
             logging.warning("Click intercepted on flyer element. Trying JavaScript click...")
             driver.execute_script("arguments[0].click();", latest_flyer_element)
-        except TimeoutException:
-            logging.error("Timed out waiting for flyer to be clickable.")
-            return None
 
-        # 2. Wait for preview page to load
+        # 2. Wait for preview page to load menu button
         logging.info("Waiting for preview page to load and menu button to appear...")
         WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'span.button__icon svg.icon-bars-horizontal, a[href*=".pdf"], button[aria-label*="download"], a[data-label="Download"]'))
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'span.button__icon svg.icon-bars-horizontal, a[href*=".pdf"]'))
         )
 
-        # 3. Click menu and find download link (USER'S ORIGINAL LOGIC)
+        # 3. Click menu and find download link
         try:
             menu_button_icon = driver.find_element(By.CSS_SELECTOR, 'span.button__icon svg.icon-bars-horizontal')
             menu_button = menu_button_icon.find_element(By.XPATH, './ancestor::button')
@@ -170,58 +175,18 @@ def get_latest_pdf_link_selenium(market_name, market_url):
             menu_button.click()
             logging.info("Clicked on menu button.")
             
-            pdf_download_link_xpath = (
-                "//a[contains(@class, 'button--primary') and contains(@class, 'menu-item__button') and ("
-                "contains(., 'PDF Download') or "
-                "contains(., 'Prospekt herunterladen') or "
-                "contains(., 'Télécharger le prospectus') or "
-                "contains(., 'Scarica il volantino') or "
-                "contains(@href, '.pdf') or "
-                "@data-label='Download' or "
-                "contains(@aria-label, 'Download')"
-                ")]"
-            )
-            pdf_download_link = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, pdf_download_link_xpath))
-            )
+            pdf_download_link_xpath = "//a[contains(@class, 'button--primary') and (contains(., 'PDF') or contains(., 'herunterladen') or contains(., 'prospectus') or contains(., 'volantino'))]"
+            pdf_download_link = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, pdf_download_link_xpath)))
             pdf_url = pdf_download_link.get_attribute('href')
             logging.info(f"Found PDF download URL in menu: {pdf_url}")
-            return pdf_url
-        except (NoSuchElementException, TimeoutException, ElementClickInterceptedException) as e:
-            logging.warning(f"Error with menu button, trying fallback. Error: {e}")
-            try:
-                direct_link_xpath = (
-                    "//a[contains(@href, '.pdf') and ("
-                    "contains(., 'PDF Download') or "
-                    "contains(., 'Prospekt herunterladen') or "
-                    "contains(., 'Télécharger le prospectus') or "
-                    "contains(., 'Scarica il volantino') or "
-                    "@data-label='Download' or "
-                    "contains(@aria-label, 'Download')"
-                    ")]"
-                )
-                direct_pdf_link_element = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, direct_link_xpath))
-                )
-                pdf_url = direct_pdf_link_element.get_attribute('href')
-                logging.info(f"Found direct PDF link on page as fallback: {pdf_url}")
-                return pdf_url
-            except (TimeoutException, NoSuchElementException) as e_fallback:
-                logging.error(f"No direct PDF link found as fallback: {e_fallback}")
-                return None
-                
-    except WebDriverException:
-        logging.exception("WebDriver error. Ensure chromedriver is installed and path is correct.")
-        return None
-    except Exception:
-        logging.exception(f"An unexpected error occurred during the Selenium process for {market_name}.")
-        try:
-            screenshot_path = f"error_screenshot_{market_name}_{int(time.time())}.png"
-            driver.save_screenshot(screenshot_path)
-            logging.info(f"Saved an error screenshot for debugging: {screenshot_path}")
+            return pdf_url, validity_text
         except Exception as e:
-            logging.error(f"Could not even save a screenshot: {e}")
-        return None
+            logging.error(f"Could not find PDF download link via menu. Error: {e}")
+            return None, validity_text
+                
+    except Exception as e:
+        logging.exception(f"An unexpected error occurred during the Selenium process for {market_name}: {e}")
+        return None, "Date not found"
     finally:
         if driver:
             logging.info("Quitting WebDriver.")
@@ -353,10 +318,6 @@ def main():
         ("lidl", "it"): "https://www.lidl.ch/c/it-CH/volantini-in-pdf/s10019683"
     }
 
-    # =========================================================================================
-    # !!! TITLE LOCALIZATION IMPLEMENTED HERE !!!
-    # This dictionary provides the correct title for each language.
-    # =========================================================================================
     catalog_titles = {
         "de": "Wöchentlicher Katalog",
         "fr": "Catalogue de la semaine",
@@ -370,12 +331,13 @@ def main():
             for file_name in os.listdir(PDF_DOWNLOAD_DIR):
                 os.remove(os.path.join(PDF_DOWNLOAD_DIR, file_name))
 
-        pdf_url_from_selenium = get_latest_pdf_link_selenium(market_name, market_url)
-        if not pdf_url_from_selenium:
+        pdf_url, validity_string = get_catalog_data(market_name, market_url)
+
+        if not pdf_url:
             logging.error(f"Failed to find PDF URL for {market_name} ({lang_code}). Skipping.")
             continue
             
-        downloaded_pdf_path = download_pdf(pdf_url_from_selenium, market_name, lang_code)
+        downloaded_pdf_path = download_pdf(pdf_url, market_name, lang_code)
         if not downloaded_pdf_path:
             logging.error(f"Could not download PDF for {market_name} ({lang_code}). Skipping.")
             continue
@@ -394,13 +356,10 @@ def main():
             
         thumbnail_url = storage_urls[0] if storage_urls else ''
         
-        # Get the localized title from the dictionary, with a default fallback
         base_title = catalog_titles.get(lang_code, "Weekly Catalog")
         catalog_title = f"{market_name.capitalize()} {base_title}"
         
-        catalog_validity = f"Valid from {datetime.date.today().strftime('%d.%m.%Y')} - Next Week"
-        
-        update_firestore(market_name, catalog_title, catalog_validity, thumbnail_url, storage_urls, lang_code)
+        update_firestore(market_name, catalog_title, validity_string, thumbnail_url, storage_urls, lang_code)
         logging.info(f"--- Successfully processed {market_name.upper()} ({lang_code.upper()}) ---")
         
     logging.info("--- All Catalog Automation Finished ---")
