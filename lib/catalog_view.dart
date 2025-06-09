@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:catalog_app/models/brochure.dart'; // Brochure modelini import ediyoruz
+import 'package:catalog_app/models/brochure.dart';
+// RECOMMENDED: Add this package to your pubspec.yaml for better image handling
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CatalogView extends StatefulWidget {
-  final Brochure brochure; // Artık tek bir Brochure nesnesi alıyoruz
+  final Brochure brochure;
 
   const CatalogView({
     super.key,
-    required this.brochure, // Constructor'ı güncelledik
+    required this.brochure,
   });
 
   @override
@@ -14,18 +16,18 @@ class CatalogView extends StatefulWidget {
 }
 
 class _CatalogViewState extends State<CatalogView> {
-  late PageController _pageController; // Sayfalar arası geçiş için PageController
-  int _currentPage = 0; // Mevcut sayfa numarası
+  late PageController _pageController;
+  int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(); // PageController'ı başlat
+    _pageController = PageController();
   }
 
   @override
   void dispose() {
-    _pageController.dispose(); // Controller'ı dispose etmeyi unutma
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -33,16 +35,14 @@ class _CatalogViewState extends State<CatalogView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // Başlığı brochure nesnesinden alıyoruz
-        title: Text(widget.brochure.title), 
+        title: Text(widget.brochure.title),
         centerTitle: true,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(20.0), // Küçük bir alt bar yüksekliği
+          preferredSize: const Size.fromHeight(20.0),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: Text(
-              // Geçerlilik tarihini brochure nesnesinden alıyoruz
-              widget.brochure.validity, 
+              widget.brochure.validity,
               style: const TextStyle(color: Colors.white70, fontSize: 14),
             ),
           ),
@@ -50,31 +50,32 @@ class _CatalogViewState extends State<CatalogView> {
       ),
       body: PageView.builder(
         controller: _pageController,
-        itemCount: widget.brochure.catalogPageImages.length, // Resim sayısı kadar sayfa
+        // CHANGED: Use brochure.pages list
+        itemCount: widget.brochure.pages.length,
         itemBuilder: (context, index) {
-          // Her sayfada katalog resmini göster
-          return Center(
-            child: InteractiveViewer( // Resimleri yakınlaştırma/kaydırma için
-              maxScale: 4.0, // Maksimum yakınlaştırma
-              minScale: 0.8, // Minimum yakınlaştırma (küçültme)
-              child: Image.asset(
-                widget.brochure.catalogPageImages[index], // Resim yolunu kullan
-                fit: BoxFit.contain, // Resmi sayfaya sığdır
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(child: Text('Resim yüklenemedi.')); // Hata mesajı
-                },
+          // CHANGED: Switched from Image.asset to Image.network (via CachedNetworkImage)
+          return InteractiveViewer(
+            maxScale: 5.0,
+            child: CachedNetworkImage(
+              imageUrl: widget.brochure.pages[index], // Load image from URL
+              fit: BoxFit.contain,
+              // Show a loading indicator while the image is downloading
+              placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+              // Show an error icon if the image fails to load
+              errorWidget: (context, url, error) => const Center(
+                child: Icon(Icons.error_outline, color: Colors.red, size: 50),
               ),
             ),
           );
         },
         onPageChanged: (int page) {
           setState(() {
-            _currentPage = page; // Sayfa değiştikçe güncel sayfa numarasını ayarla
+            _currentPage = page;
           });
         },
       ),
       bottomNavigationBar: BottomAppBar(
-        color: Theme.of(context).appBarTheme.backgroundColor, // AppBar rengini kullan
+        color: Theme.of(context).appBarTheme.backgroundColor,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -87,23 +88,24 @@ class _CatalogViewState extends State<CatalogView> {
                         curve: Curves.ease,
                       );
                     }
-                  : null, // İlk sayfadaysa devre dışı
+                  : null,
             ),
             Text(
-              // Sayfa numarası gösterimi
-              'Sayfa ${_currentPage + 1} / ${widget.brochure.catalogPageImages.length}',
+              // CHANGED: Use brochure.pages list for page count
+              'Sayfa ${_currentPage + 1} / ${widget.brochure.pages.length}',
               style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
             IconButton(
               icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
-              onPressed: _currentPage < widget.brochure.catalogPageImages.length - 1
+              // CHANGED: Use brochure.pages list for page count
+              onPressed: _currentPage < widget.brochure.pages.length - 1
                   ? () {
                       _pageController.nextPage(
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.ease,
                       );
                     }
-                  : null, // Son sayfadaysa devre dışı
+                  : null,
             ),
           ],
         ),
