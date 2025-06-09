@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// RECOMMENDED: Add this package to your pubspec.yaml for better image handling
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:catalog_app/models/brochure.dart';
 import 'package:catalog_app/catalog_view.dart';
@@ -13,10 +12,10 @@ class BrochureListScreen extends StatefulWidget {
 }
 
 class _BrochureListScreenState extends State<BrochureListScreen> {
-  // ADDED: State variable to hold the selected language, defaults to German.
+  // State variable to hold the selected language, defaults to German.
   String _selectedLanguage = 'de';
 
-  // ADDED: Helper function to build the Firestore query dynamically based on language.
+  // Helper function to build the Firestore query dynamically based on language.
   Stream<QuerySnapshot> _buildStream() {
     return FirebaseFirestore.instance
         .collection('brochures')
@@ -29,10 +28,11 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kataloglar'),
+        // CHANGED: Title translated to English
+        title: const Text('Catalogs'),
         centerTitle: true,
         actions: [
-          // ADDED: Language selection dropdown menu
+          // Language selection dropdown menu
           PopupMenuButton<String>(
             icon: const Icon(Icons.language),
             onSelected: (String languageCode) {
@@ -40,7 +40,8 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                 _selectedLanguage = languageCode;
               });
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Dil ${languageCode.toUpperCase()} olarak değiştirildi.')),
+                // CHANGED: SnackBar message translated to English
+                SnackBar(content: Text('Language changed to ${languageCode.toUpperCase()}.')),
               );
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -61,17 +62,18 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // CHANGED: The stream now uses our dynamic query builder.
         stream: _buildStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Hata: ${snapshot.error}'));
+            // CHANGED: Error message translated to English
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('Bu dil için hiç katalog bulunamadı.'));
+            // CHANGED: Empty state message translated to English
+            return const Center(child: Text('No catalogs found for this language.'));
           }
 
           List<Brochure> brochures = snapshot.data!.docs
@@ -89,7 +91,6 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                 clipBehavior: Clip.antiAlias,
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(10.0),
-                  // CHANGED: Switched from Image.asset to Image.network (via CachedNetworkImage)
                   leading: SizedBox(
                     width: 80,
                     height: 80,

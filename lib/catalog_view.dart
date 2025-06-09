@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:catalog_app/models/brochure.dart';
-// RECOMMENDED: Add this package to your pubspec.yaml for better image handling
 import 'package:cached_network_image/cached_network_image.dart';
 
 class CatalogView extends StatefulWidget {
@@ -50,20 +49,24 @@ class _CatalogViewState extends State<CatalogView> {
       ),
       body: PageView.builder(
         controller: _pageController,
-        // CHANGED: Use brochure.pages list
         itemCount: widget.brochure.pages.length,
         itemBuilder: (context, index) {
-          // CHANGED: Switched from Image.asset to Image.network (via CachedNetworkImage)
           return InteractiveViewer(
             maxScale: 5.0,
             child: CachedNetworkImage(
-              imageUrl: widget.brochure.pages[index], // Load image from URL
+              imageUrl: widget.brochure.pages[index],
               fit: BoxFit.contain,
-              // Show a loading indicator while the image is downloading
               placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-              // Show an error icon if the image fails to load
+              // CHANGED: Error message translated to English
               errorWidget: (context, url, error) => const Center(
-                child: Icon(Icons.error_outline, color: Colors.red, size: 50),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red, size: 50),
+                    SizedBox(height: 8),
+                    Text('Image could not be loaded.'),
+                  ],
+                ),
               ),
             ),
           );
@@ -91,13 +94,12 @@ class _CatalogViewState extends State<CatalogView> {
                   : null,
             ),
             Text(
-              // CHANGED: Use brochure.pages list for page count
-              'Sayfa ${_currentPage + 1} / ${widget.brochure.pages.length}',
+              // CHANGED: Page count text translated to English
+              'Page ${_currentPage + 1} / ${widget.brochure.pages.length}',
               style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
             IconButton(
               icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
-              // CHANGED: Use brochure.pages list for page count
               onPressed: _currentPage < widget.brochure.pages.length - 1
                   ? () {
                       _pageController.nextPage(

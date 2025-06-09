@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
       ),
-      // Uygulamanın ana ekranı artık BrochureListScreen olacak
+      // CHANGED: Home screen set to BrochureListScreen
       home: const BrochureListScreen(),
       debugShowCheckedModeBanner: false,
     );

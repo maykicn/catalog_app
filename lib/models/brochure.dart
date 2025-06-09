@@ -5,9 +5,9 @@ class Brochure {
   final String marketName;
   final String title;
   final String validity;
-  // CHANGED: Field name updated to match Firestore
+  // Field name updated to match Firestore
   final String thumbnail; 
-  // CHANGED: Field name updated to match Firestore
+  // Field name updated to match Firestore
   final List<String> pages; 
   final Timestamp timestamp;
 
@@ -16,26 +16,22 @@ class Brochure {
     required this.marketName,
     required this.title,
     required this.validity,
-    // CHANGED: Parameter name updated
     required this.thumbnail, 
-    // CHANGED: Parameter name updated
     required this.pages, 
     required this.timestamp,
   });
 
-  // Firestore DocumentSnapshot'tan Brochure nesnesi oluşturmak için factory constructor
+  // Factory constructor to create a Brochure object from a Firestore DocumentSnapshot
   factory Brochure.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return Brochure(
-      id: doc.id,
-      marketName: data['marketName'] ?? 'Bilinmeyen Market',
-      title: data['title'] ?? 'Bilinmeyen Başlık',
-      validity: data['validity'] ?? 'Geçerlilik Yok',
-      // CHANGED: Mapping from 'thumbnail' field in Firestore
+      id: doc.id, // Document ID
+      marketName: data['marketName'] ?? 'Unknown Market', // marketName from Firestore
+      title: data['title'] ?? 'Unknown Title',
+      validity: data['validity'] ?? 'No Validity',
       thumbnail: data['thumbnail'] ?? '', 
-      // CHANGED: Mapping from 'pages' field in Firestore
-      pages: List<String>.from(data['pages'] ?? []), 
-      timestamp: data['timestamp'] as Timestamp,
+      pages: List<String>.from(data['pages'] ?? []), // 'pages' from Firebase
+      timestamp: data['timestamp'] as Timestamp, // 'timestamp' from Firebase
     );
   }
 }

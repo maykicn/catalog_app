@@ -188,7 +188,7 @@ def get_latest_pdf_link_selenium(market_name, market_url):
             logging.info(f"Found PDF download URL in menu: {pdf_url}")
             return pdf_url
         except (NoSuchElementException, TimeoutException, ElementClickInterceptedException) as e:
-            logging.warning(f"Error with menu button or PDF download link: {e}. Trying fallback...")
+            logging.warning(f"Error with menu button, trying fallback. Error: {e}")
             try:
                 direct_link_xpath = (
                     "//a[contains(@href, '.pdf') and ("
@@ -228,46 +228,26 @@ def get_latest_pdf_link_selenium(market_name, market_url):
             driver.quit()
 
 def download_pdf(pdf_url, market_name, lang_code):
-    """Downloads a PDF from a URL or finds the latest downloaded file."""
+    """Downloads a PDF from a URL."""
+    if not pdf_url:
+        logging.error("No PDF URL provided to download_pdf function.")
+        return None
+
     filename = f"{market_name}_{lang_code}_catalog_{datetime.date.today().strftime('%Y%m%d')}.pdf"
     filepath = os.path.join(PDF_DOWNLOAD_DIR, filename)
-
-    if pdf_url:
-        logging.info(f"Downloading PDF from: {pdf_url} to {filepath}...")
-        try:
-            response = requests.get(pdf_url, stream=True, timeout=60)
-            response.raise_for_status()
-            with open(filepath, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            logging.info(f"PDF downloaded to: {filepath}")
-            return filepath
-        except requests.exceptions.RequestException:
-            logging.exception(f"Error downloading PDF from {pdf_url}")
-            return None
-    else:
-        logging.warning(f"No direct PDF URL provided. Checking for downloaded file in {PDF_DOWNLOAD_DIR}...")
-        time.sleep(5)
-        
-        try:
-            pdf_files = [f for f in os.listdir(PDF_DOWNLOAD_DIR) if f.endswith('.pdf')]
-            if not pdf_files:
-                logging.error(f"No PDF found in {PDF_DOWNLOAD_DIR} after Selenium operation.")
-                return None
-            
-            latest_pdf_file = max(pdf_files, key=lambda f: os.path.getmtime(os.path.join(PDF_DOWNLOAD_DIR, f)))
-            found_filepath = os.path.join(PDF_DOWNLOAD_DIR, latest_pdf_file)
-            
-            if os.path.basename(found_filepath) != filename:
-                logging.info(f"Found downloaded PDF: {found_filepath}. Renaming to: {filename}")
-                shutil.move(found_filepath, filepath)
-                return filepath
-            else:
-                logging.info(f"Found downloaded PDF: {found_filepath} (already named correctly).")
-                return found_filepath
-        except Exception:
-            logging.exception("Error finding/renaming downloaded file.")
-            return None
+    
+    logging.info(f"Downloading PDF from: {pdf_url} to {filepath}...")
+    try:
+        response = requests.get(pdf_url, stream=True, timeout=60)
+        response.raise_for_status()
+        with open(filepath, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        logging.info(f"PDF downloaded to: {filepath}")
+        return filepath
+    except requests.exceptions.RequestException:
+        logging.exception(f"Error downloading PDF from {pdf_url}")
+        return None
 
 def convert_pdf_to_images(pdf_path, output_image_dir, dpi=200):
     """Converts a PDF file into a series of PNG images."""
@@ -310,7 +290,7 @@ def upload_images_to_storage(local_image_paths, market_name, lang_code):
             blob.upload_from_filename(local_path)
             blob.make_public()
             public_urls.append(blob.public_url)
-            logging.info(f"  - Uploaded {file_name} to {destination_blob_name}")
+            logging.info(f"  - Uploaded {file_name}")
         except Exception:
             logging.exception(f"Failed to upload {os.path.basename(local_path)} to Firebase Storage.")
     
@@ -328,7 +308,8 @@ def update_firestore(market_name, catalog_title, catalog_validity, thumbnail_url
     logging.info(f"Updating Firestore for {market_name} ({language})...")
     try:
         query = brochures_ref.where('marketName', '==', market_name).where('language', '==', language)
-        for doc in query.stream():
+        docs = query.stream()
+        for doc in docs:
             logging.info(f"  - Deleting old catalog: {doc.id}")
             doc.reference.delete()
             
@@ -371,8 +352,17 @@ def main():
         ("lidl", "fr"): "https://www.lidl.ch/c/fr-CH/prospectus-pdf/s10019683",
         ("lidl", "it"): "https://www.lidl.ch/c/it-CH/volantini-in-pdf/s10019683"
     }
-    language_names = {"de": "Deutsch", "fr": "Français", "it": "Italiano"}
 
+    # =========================================================================================
+    # !!! TITLE LOCALIZATION IMPLEMENTED HERE !!!
+    # This dictionary provides the correct title for each language.
+    # =========================================================================================
+    catalog_titles = {
+        "de": "Wöchentlicher Katalog",
+        "fr": "Catalogue de la semaine",
+        "it": "Catalogo della settimana"
+    }
+    
     for (market_name, lang_code), market_url in markets_and_languages.items():
         logging.info(f"--- Processing {market_name.upper()} ({lang_code.upper()}) ---")
 
@@ -387,7 +377,7 @@ def main():
             
         downloaded_pdf_path = download_pdf(pdf_url_from_selenium, market_name, lang_code)
         if not downloaded_pdf_path:
-            logging.error(f"Could not download or find PDF for {market_name} ({lang_code}). Skipping.")
+            logging.error(f"Could not download PDF for {market_name} ({lang_code}). Skipping.")
             continue
             
         current_image_output_dir = os.path.join(LOCAL_IMAGE_DIR, market_name, lang_code)
@@ -403,7 +393,11 @@ def main():
             continue
             
         thumbnail_url = storage_urls[0] if storage_urls else ''
-        catalog_title = f"{market_name.capitalize()} Weekly Catalog ({language_names.get(lang_code, lang_code.upper())})"
+        
+        # Get the localized title from the dictionary, with a default fallback
+        base_title = catalog_titles.get(lang_code, "Weekly Catalog")
+        catalog_title = f"{market_name.capitalize()} {base_title}"
+        
         catalog_validity = f"Valid from {datetime.date.today().strftime('%d.%m.%Y')} - Next Week"
         
         update_firestore(market_name, catalog_title, catalog_validity, thumbnail_url, storage_urls, lang_code)
