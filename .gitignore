@@ -58,3 +58,6 @@ assets/images/
 
 # chrome driver
 chromedriver.exe
+
+# Temporary files
+TODO.md
