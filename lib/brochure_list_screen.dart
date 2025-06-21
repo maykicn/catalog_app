@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:catalog_app/models/brochure.dart';
 import 'package:catalog_app/catalog_view.dart';
+import 'package:catalog_app/catalog_selection_screen.dart'; // <<< IMPORT NEW SCREEN
 
 class BrochureListScreen extends StatefulWidget {
   const BrochureListScreen({super.key});
@@ -12,31 +13,37 @@ class BrochureListScreen extends StatefulWidget {
 }
 
 class _BrochureListScreenState extends State<BrochureListScreen> {
-  // State variable to hold the selected language, defaults to German.
   String _selectedLanguage = 'de';
 
-  // Helper function to build the Firestore query dynamically based on language.
   Stream<QuerySnapshot> _buildStream() {
     return FirebaseFirestore.instance
         .collection('brochures')
-        .where('language', isEqualTo: _selectedLanguage) // Filter by selected language
-        .orderBy('timestamp', descending: true)
+        .where('language', isEqualTo: _selectedLanguage)
+        .orderBy('marketName') // Order by market name for grouping
+        .orderBy('weekType')   // Then order by 'current' then 'next'
         .snapshots();
+  }
+
+  // <<< NEW HELPER FUNCTION TO GROUP BROCHURES >>>
+  Map<String, List<Brochure>> _groupBrochures(List<Brochure> brochures) {
+    final Map<String, List<Brochure>> grouped = {};
+    for (final brochure in brochures) {
+      if (grouped.containsKey(brochure.marketName)) {
+        grouped[brochure.marketName]!.add(brochure);
+      } else {
+        grouped[brochure.marketName] = [brochure];
+      }
+    }
+    return grouped;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // Title translated to English
         title: const Text('Catalogs'),
         centerTitle: true,
         actions: [
-          // =========================================================================================
-          // !!! FANCY LANGUAGE BUTTON IMPLEMENTED HERE !!!
-          // The generic globe icon has been replaced with a styled button that shows the
-          // current language code (DE, FR, IT). Tapping this button opens the menu.
-          // =========================================================================================
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
             child: PopupMenuButton<String>(
@@ -53,20 +60,10 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                 );
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                const PopupMenuItem<String>(
-                  value: 'de',
-                  child: Text('Deutsch'),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'fr',
-                  child: Text('Français'),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'it',
-                  child: Text('Italiano'),
-                ),
+                const PopupMenuItem<String>(value: 'de', child: Text('Deutsch')),
+                const PopupMenuItem<String>(value: 'fr', child: Text('Français')),
+                const PopupMenuItem<String>(value: 'it', child: Text('Italiano')),
               ],
-              // This is the new button widget that replaces the old icon
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
@@ -85,6 +82,7 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
           ),
         ],
       ),
+      // <<< BODY LOGIC IS COMPLETELY REPLACED >>>
       body: StreamBuilder<QuerySnapshot>(
         stream: _buildStream(),
         builder: (context, snapshot) {
@@ -92,22 +90,29 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            // Error message translated to English
             return Center(child: Text('Error: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            // Empty state message translated to English
             return const Center(child: Text('No catalogs found for this language.'));
           }
 
-          List<Brochure> brochures = snapshot.data!.docs
+          // Convert docs to Brochure objects
+          final allBrochures = snapshot.data!.docs
               .map((doc) => Brochure.fromFirestore(doc))
               .toList();
+          
+          // Group brochures by market name
+          final groupedBrochures = _groupBrochures(allBrochures);
+          final marketNames = groupedBrochures.keys.toList();
 
           return ListView.builder(
-            itemCount: brochures.length,
+            itemCount: marketNames.length,
             itemBuilder: (context, index) {
-              Brochure brochure = brochures[index];
+              final marketName = marketNames[index];
+              final marketBrochures = groupedBrochures[marketName]!;
+              // The first brochure is used for the preview (e.g., 'current')
+              final previewBrochure = marketBrochures.first;
+
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
                 elevation: 4,
@@ -118,16 +123,13 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                   leading: SizedBox(
                     width: 80,
                     height: 80,
-                    child: brochure.thumbnail.isNotEmpty
+                    child: previewBrochure.thumbnail.isNotEmpty
                         ? CachedNetworkImage(
-                            imageUrl: brochure.thumbnail,
+                            imageUrl: previewBrochure.thumbnail,
                             imageBuilder: (context, imageProvider) => Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  image: imageProvider,
-                                  fit: BoxFit.cover,
-                                ),
+                                image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
                               ),
                             ),
                             placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2.0)),
@@ -135,17 +137,32 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                           )
                         : const Icon(Icons.image_not_supported, size: 60),
                   ),
-                  title: Text(brochure.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${brochure.marketName.toUpperCase()} - ${brochure.validity}'),
+                  // Display the market name as the main title
+                  title: Text(previewBrochure.marketName.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  // Display how many catalogs are available
+                  subtitle: Text('${marketBrochures.length} catalog(s) available'),
+                  // <<< NEW CONDITIONAL NAVIGATION LOGIC >>>
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CatalogView(
-                          brochure: brochure,
+                    if (marketBrochures.length == 1) {
+                      // SCENARIO A: Only one catalog, go directly to detail view
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CatalogView(brochure: marketBrochures.first),
                         ),
-                      ),
-                    );
+                      );
+                    } else {
+                      // SCENARIO B: More than one catalog, go to selection screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CatalogSelectionScreen(
+                            marketName: marketName,
+                            brochures: marketBrochures,
+                          ),
+                        ),
+                      );
+                    }
                   },
                 ),
               );
@@ -153,7 +170,6 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
           );
         },
       ),
-      // Bottom navigation bar (unchanged)
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),

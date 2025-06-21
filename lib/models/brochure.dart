@@ -5,11 +5,10 @@ class Brochure {
   final String marketName;
   final String title;
   final String validity;
-  // Field name updated to match Firestore
   final String thumbnail; 
-  // Field name updated to match Firestore
   final List<String> pages; 
   final Timestamp timestamp;
+  final String weekType; // <<< NEW FIELD
 
   Brochure({
     required this.id,
@@ -19,19 +18,22 @@ class Brochure {
     required this.thumbnail, 
     required this.pages, 
     required this.timestamp,
+    required this.weekType, // <<< ADDED TO CONSTRUCTOR
   });
 
   // Factory constructor to create a Brochure object from a Firestore DocumentSnapshot
   factory Brochure.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return Brochure(
-      id: doc.id, // Document ID
-      marketName: data['marketName'] ?? 'Unknown Market', // marketName from Firestore
+      id: doc.id,
+      marketName: data['marketName'] ?? 'Unknown Market',
       title: data['title'] ?? 'Unknown Title',
       validity: data['validity'] ?? 'No Validity',
       thumbnail: data['thumbnail'] ?? '', 
-      pages: List<String>.from(data['pages'] ?? []), // 'pages' from Firebase
-      timestamp: data['timestamp'] as Timestamp, // 'timestamp' from Firebase
+      pages: List<String>.from(data['pages'] ?? []),
+      timestamp: data['timestamp'] as Timestamp,
+      // Default to 'current' if the field doesn't exist in Firestore
+      weekType: data['weekType'] ?? 'current', // <<< NEW MAPPING
     );
   }
 }
