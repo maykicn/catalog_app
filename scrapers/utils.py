@@ -9,6 +9,8 @@ import fitz  # PyMuPDF
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+import datetime
+import re
 
 # =========================================================================================
 # GLOBAL CONFIGURATION
@@ -173,12 +175,12 @@ def clear_old_catalogs(market_name, language):
     except Exception as e:
         logging.exception(f"Error clearing old Firestore entries: {e}")
 
-def add_catalog_to_firestore(market_name, catalog_title, catalog_validity, thumbnail_url, page_urls, language):
-    """Adds a new catalog to Firestore."""
+def add_catalog_to_firestore(market_name, catalog_title, catalog_validity, thumbnail_url, page_urls, language, week_type):
+    """Adds a new catalog to Firestore, including its week type ('current' or 'next')."""
     if not page_urls:
         logging.warning("No page URLs to upload, skipping Firestore update.")
         return
-    logging.info(f"Adding new catalog to Firestore: '{catalog_title}'")
+    logging.info(f"Adding new catalog to Firestore: '{catalog_title}' (Type: {week_type})")
     brochures_ref = db.collection('brochures')
     try:
         new_catalog_data = {
@@ -188,9 +190,34 @@ def add_catalog_to_firestore(market_name, catalog_title, catalog_validity, thumb
             'thumbnail': thumbnail_url,
             'pages': page_urls,
             'timestamp': firestore.SERVER_TIMESTAMP,
-            'language': language
+            'language': language,
+            'weekType': week_type  # NEW FIELD FOR THE UI
         }
         doc_ref = brochures_ref.add(new_catalog_data)
         logging.info(f"New catalog added to Firestore with ID: {doc_ref[1].id}")
     except Exception as e:
         logging.exception(f"Error adding document to Firestore: {e}")
+
+def extract_start_date(validity_string):
+    """
+    Extracts the first DD.MM date from a string and returns a date object.
+    Handles the year-end transition correctly.
+    """
+    match = re.search(r'(\d{1,2})\.(\d{1,2})\.?', validity_string)
+    if not match:
+        return None
+
+    day = int(match.group(1))
+    month = int(match.group(2))
+    today = datetime.date.today()
+    
+    # Handle year-end case (e.g., in December, a catalog for January is for next year)
+    year = today.year
+    if month < today.month:
+        year += 1
+        
+    try:
+        return datetime.date(year, month, day)
+    except ValueError:
+        # Handles invalid dates like 31.02
+        return None
