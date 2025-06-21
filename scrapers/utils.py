@@ -221,3 +221,19 @@ def extract_start_date(validity_string):
     except ValueError:
         # Handles invalid dates like 31.02
         return None
+    
+
+def get_stored_validity_strings(market_name, language):
+    """
+    Fetches only the 'validity' strings of currently stored brochures from Firestore
+    for a specific market and language.
+    """
+    try:
+        brochures_ref = db.collection('brochures')
+        query = brochures_ref.where('marketName', '==', market_name).where('language', '==', language)
+        docs = query.stream()
+        # Create a list of all validity strings found in the database
+        return [doc.to_dict().get('validity', '') for doc in docs]
+    except Exception as e:
+        logging.error(f"Could not fetch stored validity strings for {market_name} ({language}). Error: {e}")
+        return []
