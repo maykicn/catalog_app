@@ -19,12 +19,11 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
     return FirebaseFirestore.instance
         .collection('brochures')
         .where('language', isEqualTo: _selectedLanguage)
-        .orderBy('marketName') // Order by market name for grouping
-        .orderBy('weekType')   // Then order by 'current' then 'next'
+        .orderBy('marketName')
+        .orderBy('weekType')
         .snapshots();
   }
 
-  // <<< NEW HELPER FUNCTION TO GROUP BROCHURES >>>
   Map<String, List<Brochure>> _groupBrochures(List<Brochure> brochures) {
     final Map<String, List<Brochure>> grouped = {};
     for (final brochure in brochures) {
@@ -35,6 +34,20 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
       }
     }
     return grouped;
+  }
+
+  // <<< NEW HELPER FUNCTION FOR TRANSLATIONS >>>
+  String _getSubtitleForMultipleCatalogs(String languageCode) {
+    switch (languageCode) {
+      case 'de':
+        return 'Aktuelle & kommende Angebote'; // German
+      case 'fr':
+        return 'Offres actuelles et à venir'; // French
+      case 'it':
+        return 'Offerte attuali e future'; // Italian
+      default:
+        return 'Current & upcoming offers'; // Fallback
+    }
   }
 
   @override
@@ -82,7 +95,6 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
           ),
         ],
       ),
-      // <<< BODY LOGIC IS COMPLETELY REPLACED >>>
       body: StreamBuilder<QuerySnapshot>(
         stream: _buildStream(),
         builder: (context, snapshot) {
@@ -96,12 +108,10 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
             return const Center(child: Text('No catalogs found for this language.'));
           }
 
-          // Convert docs to Brochure objects
           final allBrochures = snapshot.data!.docs
               .map((doc) => Brochure.fromFirestore(doc))
               .toList();
           
-          // Group brochures by market name
           final groupedBrochures = _groupBrochures(allBrochures);
           final marketNames = groupedBrochures.keys.toList();
 
@@ -110,7 +120,6 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
             itemBuilder: (context, index) {
               final marketName = marketNames[index];
               final marketBrochures = groupedBrochures[marketName]!;
-              // The first brochure is used for the preview (e.g., 'current')
               final previewBrochure = marketBrochures.first;
 
               return Card(
@@ -137,14 +146,21 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                           )
                         : const Icon(Icons.image_not_supported, size: 60),
                   ),
-                  // Display the market name as the main title
                   title: Text(previewBrochure.marketName.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  // Display how many catalogs are available
-                  subtitle: Text('${marketBrochures.length} catalog(s) available'),
-                  // <<< NEW CONDITIONAL NAVIGATION LOGIC >>>
+                  
+                  subtitle: Text(
+                    marketBrochures.length > 1
+                        ? _getSubtitleForMultipleCatalogs(_selectedLanguage)
+                        : previewBrochure.validity,
+                    style: TextStyle(
+                      fontSize: 12.5, // <<< THIS LINE MAKES THE FONT SMALLER
+                      color: marketBrochures.length > 1 ? Colors.blue.shade700 : null,
+                      fontWeight: marketBrochures.length > 1 ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  
                   onTap: () {
                     if (marketBrochures.length == 1) {
-                      // SCENARIO A: Only one catalog, go directly to detail view
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -152,7 +168,6 @@ class _BrochureListScreenState extends State<BrochureListScreen> {
                         ),
                       );
                     } else {
-                      // SCENARIO B: More than one catalog, go to selection screen
                       Navigator.push(
                         context,
                         MaterialPageRoute(

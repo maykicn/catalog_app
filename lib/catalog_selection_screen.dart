@@ -55,7 +55,13 @@ class CatalogSelectionScreen extends StatelessWidget {
                     : const Icon(Icons.image_not_supported, size: 60),
               ),
               title: Text(brochure.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(brochure.validity),
+
+              // <<< THIS SUBTITLE IS NOW FIXED >>>
+              subtitle: Text(
+                brochure.validity,
+                style: const TextStyle(fontSize: 12.5), // Apply smaller font size here as well
+              ),
+              
               onTap: () {
                 // This tap navigates to the final detail view
                 Navigator.push(

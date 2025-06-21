@@ -148,11 +148,10 @@ def main():
                 storage_urls = upload_images_to_storage(local_image_paths, market_name, lang_code, catalog_id)
                 if not storage_urls: continue
 
-                # Create a more descriptive title for the UI
+                # Create the catalog title without extra suffixes
                 thumbnail_url = storage_urls[0] if storage_urls else ''
                 base_title = config["titles"].get(lang_code, "Weekly Catalog")
-                title_suffix = "(Current Week)" if week_type == 'current' else "(Next Week)"
-                catalog_title = f"{market_name.capitalize()} {base_title} {title_suffix}"
+                catalog_title = f"{market_name.capitalize()} {base_title}" # Suffix removed
 
                 # Add to Firestore with the new week_type field
                 add_catalog_to_firestore(market_name, catalog_title, validity_string, thumbnail_url, storage_urls, lang_code, week_type)
